@@ -1,0 +1,109 @@
+library(tidyverse)
+library(rjags)
+library(glue) # R fstring
+
+
+data = read.csv("C://Users/User/Desktop/MA_Thesis/OSF_upload/data/dataset_for_analysis.csv") # specify path to the dataset
+
+
+### Data transformation
+
+
+# Add values of TCI to Moscow_O & Leningrad (taken from Moscow and St. Petersburg, respectively)
+data[39, 11] <- 0.8403392
+data[45, 11] <- 0.9123744
+
+# Replace NA with 0 in protests
+data["pr_quan_avg"][is.na(data["pr_quan_avg"])] <- 0
+
+# Skip Leningard oblast as an outlier
+data_84 = data %>% filter(region != 'Leningrad')
+
+
+
+### Model template
+
+
+run_jags_model <- function() {
+  data_r2 = data_84 %>% dplyr::select(pb_count_sum, inst_qual_17, elites, pr_quan_avg)
+  mod_string_pol_0 = " model {
+    for (i in 1:length(pb_count_sum)) {
+        pb_count_sum[i] ~ dnegbin(p[i],r)
+        p[i] <- r/(r+lambda[i]) 
+        log(lambda[i]) = int + b_ins*inst_qual_17[i] + b_elt*elites[i] + b_pro*pr_quan_avg[i] 
+    }
+    
+    int ~ dnorm(0.0, 1.0/10e1)
+    b_ins ~ dnorm(0.0, 1.0/10e1)
+    b_elt ~ dnorm(0.0, 1.0/10e1)
+    b_pro ~ dnorm(0.0, 1.0/10e1)
+    r ~ dunif(0, 50)
+} "
+  
+  set.seed(3)
+  data_jags = as.list(na.omit(data_r2))
+  params = c("int", "b_ins", "b_elt", "b_pro", "r")
+  
+  mod_pol_0 = jags.model(textConnection(mod_string_pol_0), data=data_jags, n.chains=3)
+  update(mod_pol_0, 1e3)
+  mod_sim_pol_0 = coda.samples(model=mod_pol_0, variable.names=params, n.iter=3e4)
+  summary(mod_sim_pol_0)
+  dic.samples(mod_pol_0, n.iter=1e3)
+}
+
+
+
+run_jags_model()
+
+
+### Main analysis
+
+
+data_r2 = data_84 %>% dplyr::select(pb_count_sum, inst_qual_17, elites, pr_quan_avg)
+
+mod_string_pol_0 = " model {
+    for (i in 1:length(pb_count_sum)) {
+        pb_count_sum[i] ~ dnegbin(p[i],r)
+        p[i] <- r/(r+lambda[i]) 
+        log(lambda[i]) = int + b_ins*inst_qual_17[i] + b_elt*elites[i] + b_pro*pr_quan_avg[i] 
+    }
+    
+    int ~ dnorm(0.0, 1.0/10e1)
+    b_ins ~ dnorm(0.0, 1.0/10e1)
+    b_elt ~ dnorm(0.0, 1.0/10e1)
+    b_pro ~ dnorm(0.0, 1.0/10e1)
+    r ~ dunif(0, 50)
+} "
+
+set.seed(3)
+data_jags = as.list(na.omit(data_r2))
+params = c("int", "b_ins", "b_elt", "b_pro", "r")
+
+mod_pol_0 = jags.model(textConnection(mod_string_pol_0), data=data_jags, n.chains=3)
+update(mod_pol_0, 1e3)
+mod_sim_pol_0 = coda.samples(model=mod_pol_0, variable.names=params, n.iter=3e4)
+summary(mod_sim_pol_0)
+dic.samples(mod_pol_0, n.iter=1e3)
+
+
+
+### Plotting marginal effects
+
+
+
+
+
+
+### Diagnostics of models 6 and 16 (Appendix 2)
+
+
+
+
+
+
+### Annual cross-sections (Appendix 3)
+
+
+
+
+
